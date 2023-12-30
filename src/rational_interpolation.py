@@ -152,6 +152,37 @@ class AAA:
         SF = sp.dia_array((samples,0),(self.M,self.M)) #left scaling matrix
         J = np.array(range(self.M))
         Z = np.zeros(self.M,dtype = Z.dtype)
+        #self.samples = samples
+        R = np.mean(self.samples)
+        z = np.array([],dtype = Z.dtype)
+        f = np.array([],dtype = samples.dtype)
+        C = np.array([[]],dtype = Z.dtype)
+        errvec = np.array([],dtype = np.float64)
+        J = np.array(range(self.M))
+        
+        for i in range(mmax):
+            j = np.argmax(np.abs(R-samples))
+            z.append(Z[j])
+            f.append(samples[j])
+            #J(J==j) = [] what does this mean? and how to do it with numpy?
+            C = np.c_[C,1/(Z-z[j])]
+            Sf = np.diag(f)
+            A = SF@C-C@Sf
+            w = (sl.svd(A,full_matrices = False)[2])[i,:] #Get right singular vector with smalllest singular value
+            N = C@(w*f)
+            D = C@w
+            R = F
+            R[J] = N[J]/D[J]
+            err = sl.norm(samples-R, order = np.inf)
+            errvec = np.c_[errvec,err]
+            if err <= rtol*sl.norm(samples, order = np.inf):
+                break
+
+        return
+
+    def eval(self,z):
+        #Evaluate the interpolating funciton constructed with AAA algorithm 
+        return
         
 
 def robust_pade(c,n,m = None,r_tol = 1e-14):
