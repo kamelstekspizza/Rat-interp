@@ -196,11 +196,22 @@ class AAA:
             if err <= rtol*sl.norm(samples, ord = np.inf): #check convergence
                 break
 
+        #Keep arrays needed for evaluation
+        self.z = z
+        self.w = w
+        self.f = f
         return
 
-    def eval(self,z):
-        #Evaluate the interpolating funciton constructed with AAA algorithm 
-        return
+    def eval(self,zv):
+        #Evaluate the interpolating funciton constructed with AAA algorithm
+        C = np.zeros((zv.shape[0],self.z.shape[0]),dtype = zv.dtype)
+        for index, z_i in np.ndenumerate(self.z): #Maybe which dimension to iterate over should depend on their sizes?
+            C[:,index[0]] = 1/(zv-z_i)
+        r = C@(self.w*self.f)/(C@self.w)
+        nan_indices = np.argwhere(np.isnan(r))
+        for index in nan_indices:
+            r[index] = self.f[self.z == zv[index]]
+        return r
         
 
 def robust_pade(c,n,m = None,r_tol = 1e-14):
