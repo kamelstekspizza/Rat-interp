@@ -149,6 +149,7 @@ class AAA:
         #mmax: maximum number of iterations set to min(len(z),mmax), default value 100
         
         self.M = Z.shape[0]
+        mmax = min(self.M,mmax)
         SF = sp.dia_matrix((samples,0),(self.M,self.M),dtype = samples.dtype) #left scaling matrix
         J = np.array(range(self.M))
         R = np.mean(samples)
@@ -156,7 +157,7 @@ class AAA:
         f = np.array([],dtype = samples.dtype)
         #C = np.array([[]],dtype = Z.dtype)
         J = np.array(range(self.M))
-        mmax = min(self.M,mmax)
+       
         
         for i in range(mmax):
             j = np.argmax(np.abs(R-samples)) #find largest residual
@@ -164,9 +165,9 @@ class AAA:
             f = np.append(f,samples[j]) #append corresponding value to f
             J = np.delete(J,J==j) #remove index from index array
             if i == 0:
-                C = 1/(Z-Z[j])
-                Sf = f
-                A =  np.transpose(np.array([SF@C-C*Sf])) 
+                C = 1/(Z-Z[j]) #Construct Cauchy matrix
+                Sf = f #Scaling factor for Lowener matrix construction
+                A =  np.transpose(np.array([SF@C-C*Sf])) #Construct Loewner matrix
                 s,w = (sl.svd(A[J,:],full_matrices = False)[1:]) #Get right singular vector with smalllest singular value
                 w = np.conjugate(w[i,:])
                 N = C*(w*f) #Numerator
@@ -177,9 +178,7 @@ class AAA:
                 errvec = err 
             else:
                 C = np.c_[C,1/(Z-Z[j])] #Add column to Cauchy matrix
-                Sf = np.diag(f) #right scaling matrix
-                #A = SF@C-C@Sf #Loewner matrix
-                A = np.c_[A,(samples-f[-1])*C[:,-1]] #Loewner matrix
+                A = np.c_[A,(samples-f[-1])*C[:,-1]] #Add column to Loewner matrix
                 s,w = (sl.svd(A[J,:],full_matrices = False)[1:]) #Get right singular vector with smalllest singular value
                 w = np.conjugate(w[i,:])
                 i0 = np.nonzero(w!=0)
@@ -201,12 +200,12 @@ class AAA:
         return
 
     def eval(self,zv):
-        #Evaluate the interpolating funciton constructed with AAA algorithm
+        #Evaluate the interpolating function constructed with AAA algorithm
         C = np.zeros((zv.shape[0],self.z.shape[0]),dtype = zv.dtype)
         for index, z_i in np.ndenumerate(self.z): #Maybe which dimension to iterate over should depend on their sizes?
             C[:,index[0]] = 1/(zv-z_i)
         r = C@(self.w*self.f)/(C@self.w)
-        nan_indices = np.argwhere(np.isnan(r))
+        nan_indices = np.argwhere(np.isnan(r)) #Find nans and force interpolation there
         for index in nan_indices:
             r[index] = self.f[self.z == zv[index]]
         return r
