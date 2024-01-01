@@ -17,5 +17,17 @@ def test_sin():
     print(f'Relative interpolation error: {rel_err}')
     return
 
+def test_tan():
+    x = np.linspace(0,2*np.pi,20) + 1j*0.2
+    y = np.tan(x)
+
+    test_AAA = AAA(x,y)
+    r = test_AAA.eval(x)
+    err = sl.norm(r-y,ord=np.inf)
+    rel_err = err/sl.norm(y,ord=np.inf)
+    print(f'Relative interpolation error: {rel_err}')
+    return
+
 
 test_sin()
+test_tan()

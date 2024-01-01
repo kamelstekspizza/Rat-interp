@@ -149,19 +149,16 @@ class AAA:
         #mmax: maximum number of iterations set to min(len(z),mmax), default value 100
         
         self.M = Z.shape[0]
-        SF = sp.dia_matrix((samples,0),(self.M,self.M)) #left scaling matrix
+        SF = sp.dia_matrix((samples,0),(self.M,self.M),dtype = samples.dtype) #left scaling matrix
         J = np.array(range(self.M))
-        #self.samples = samples
-        print(samples)
         R = np.mean(samples)
         z = np.array([],dtype = Z.dtype)
         f = np.array([],dtype = samples.dtype)
         #C = np.array([[]],dtype = Z.dtype)
-        errvec = np.array([],dtype = np.float64)
         J = np.array(range(self.M))
+        mmax = min(self.M,mmax)
         
         for i in range(mmax):
-            print(i)
             j = np.argmax(np.abs(R-samples)) #find largest residual
             z = np.append(z,Z[j]) #add corresponding interpolation point to z
             f = np.append(f,samples[j]) #append corresponding value to f
@@ -170,36 +167,37 @@ class AAA:
                 C = 1/(Z-Z[j])
                 Sf = f
                 A =  np.transpose(np.array([SF@C-C*Sf])) 
-                w = (sl.svd(A[J,:],full_matrices = False)[2])[i,:] #Get right singular vector with smalllest singular value
+                s,w = (sl.svd(A[J,:],full_matrices = False)[1:]) #Get right singular vector with smalllest singular value
+                w = np.conjugate(w[i,:])
                 N = C*(w*f) #Numerator
                 D = C*w #Denominator
                 R = samples.copy() 
                 R[J] = N[J]/D[J] #Rational approximation
-                print(R)
-                print(samples)
                 err = sl.norm(samples-R, ord = np.inf) #max error at interpolation points
-                print(err)
                 errvec = err 
             else:
                 C = np.c_[C,1/(Z-Z[j])] #Add column to Cauchy matrix
                 Sf = np.diag(f) #right scaling matrix
-                A = SF@C-C@Sf #Loewner matrix
-                w = (sl.svd(A[J,:],full_matrices = False)[2])[i,:] #Get right singular vector with smalllest singular value
-                N = C@(w*f) #Numerator
-                D = C@w #Denominator
+                #A = SF@C-C@Sf #Loewner matrix
+                A = np.c_[A,(samples-f[-1])*C[:,-1]] #Loewner matrix
+                s,w = (sl.svd(A[J,:],full_matrices = False)[1:]) #Get right singular vector with smalllest singular value
+                w = np.conjugate(w[i,:])
+                i0 = np.nonzero(w!=0)
+                N = C[:,i0]@(w[i0]*f[i0]) #Numerator
+                D = C[:,i0]@w[i0] #Denominator
                 R = samples.copy()
-                R[J] = N[J]/D[J] #Rational approximation
+                R[J] = N[J,0]/D[J,0] #Rational approximation
                 err = sl.norm(samples-R, ord = np.inf) #max error at interpolation points
                 errvec = np.c_[errvec,err]
-                print(err) 
 
             if err <= rtol*sl.norm(samples, ord = np.inf): #check convergence
                 break
-
+            
         #Keep arrays needed for evaluation
         self.z = z
         self.w = w
         self.f = f
+        self.errvec = errvec #Save convergence history
         return
 
     def eval(self,zv):
