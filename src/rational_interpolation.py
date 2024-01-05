@@ -196,7 +196,43 @@ class AAA:
         self.z = z
         self.w = w
         self.f = f
+        self.n = i #The order of the rational approximation
         self.errvec = errvec #Save convergence history
+
+        print(f'Number of iterations used: {self.n+1}')
+
+        self.poles_and_zeros()
+
+        return
+
+    def poles_and_zeros(self):
+        N = self.z.shape[0] + 1 #Dimension of matrices
+
+        diag_A = np.zeros(N,dtype = np.complex128)
+        diag_A[1:] = self.z.copy()
+        A = np.diag(diag_A)
+        A[0,1:] = self.w.copy()
+        A[1:,0] = np.ones(N-1)
+
+        diag_B = np.ones(N)
+        diag_B[0] = 0
+        B = np.diag(diag_B)
+
+        poles = sl.eig(A, b = B,right = False)
+        self.poles = poles[np.nonzero(np.isfinite(poles))]
+        print(f'Poles of rational approximation: {self.poles}')
+
+        numerator = lambda z: np.sum(1/(z-self.z)*(self.f*self.w))
+        denom_diff = lambda z: np.sum(-1/(z-self.z)**2*self.w)
+        self.residues = np.array([numerator(pole)/denom_diff(pole) for pole in self.poles])
+        print(f'Residues at poles: {self.residues}')
+
+        A[0,1:] = self.w*self.f
+        zeros = sl.eig(A, b = B, right = False)
+        self.zeros = zeros[np.nonzero(np.isfinite(zeros))]
+        print(f'Zeros of rational approximation: {self.zeros}')
+
+
         return
 
     def eval(self,zv):
