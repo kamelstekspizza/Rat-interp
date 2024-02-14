@@ -149,9 +149,102 @@ class AAA:
         #mmax: maximum number of iterations set to min(len(z),mmax), default value 100
         
         self.M = Z.shape[0]
-        SF = sp.dia_array((samples,0),(self.M,self.M)) #left scaling matrix
+        mmax = min(self.M,mmax)
+        SF = sp.dia_matrix((samples,0),(self.M,self.M),dtype = samples.dtype) #left scaling matrix
         J = np.array(range(self.M))
-        Z = np.zeros(self.M,dtype = Z.dtype)
+        R = np.mean(samples)
+        z = np.array([],dtype = Z.dtype)
+        f = np.array([],dtype = samples.dtype)
+        #C = np.array([[]],dtype = Z.dtype)
+        J = np.array(range(self.M))
+       
+        
+        for i in range(mmax):
+            j = np.argmax(np.abs(R-samples)) #find largest residual
+            z = np.append(z,Z[j]) #add corresponding interpolation point to z
+            f = np.append(f,samples[j]) #append corresponding value to f
+            J = np.delete(J,J==j) #remove index from index array
+            if i == 0:
+                C = 1/(Z-Z[j]) #Construct Cauchy matrix
+                Sf = f #Scaling factor for Lowener matrix construction
+                A =  np.transpose(np.array([SF@C-C*Sf])) #Construct Loewner matrix
+                s,w = (sl.svd(A[J,:],full_matrices = False)[1:]) #Get right singular vector with smalllest singular value
+                w = np.conjugate(w[i,:])
+                N = C*(w*f) #Numerator
+                D = C*w #Denominator
+                R = samples.copy() 
+                R[J] = N[J]/D[J] #Rational approximation
+                err = sl.norm(samples-R, ord = np.inf) #max error at interpolation points
+                errvec = err 
+            else:
+                C = np.c_[C,1/(Z-Z[j])] #Add column to Cauchy matrix
+                A = np.c_[A,(samples-f[-1])*C[:,-1]] #Add column to Loewner matrix
+                s,w = (sl.svd(A[J,:],full_matrices = False)[1:]) #Get right singular vector with smalllest singular value
+                w = np.conjugate(w[i,:])
+                i0 = np.nonzero(w!=0)
+                N = C[:,i0]@(w[i0]*f[i0]) #Numerator
+                D = C[:,i0]@w[i0] #Denominator
+                R = samples.copy()
+                R[J] = N[J,0]/D[J,0] #Rational approximation
+                err = sl.norm(samples-R, ord = np.inf) #max error at interpolation points
+                errvec = np.c_[errvec,err]
+
+            if err <= rtol*sl.norm(samples, ord = np.inf): #check convergence
+                break
+            
+        #Keep arrays needed for evaluation
+        self.z = z
+        self.w = w
+        self.f = f
+        self.n = i #The order of the rational approximation
+        self.errvec = errvec #Save convergence history
+
+        print(f'Number of iterations used: {self.n+1}')
+
+        self.poles_and_zeros()
+
+        return
+
+    def poles_and_zeros(self):
+        N = self.z.shape[0] + 1 #Dimension of matrices
+
+        diag_A = np.zeros(N,dtype = np.complex128)
+        diag_A[1:] = self.z.copy()
+        A = np.diag(diag_A)
+        A[0,1:] = self.w.copy()
+        A[1:,0] = np.ones(N-1)
+
+        diag_B = np.ones(N)
+        diag_B[0] = 0
+        B = np.diag(diag_B)
+
+        poles = sl.eig(A, b = B,right = False)
+        self.poles = poles[np.nonzero(np.isfinite(poles))]
+        print(f'Poles of rational approximation: {self.poles}')
+
+        numerator = lambda z: np.sum(1/(z-self.z)*(self.f*self.w))
+        denom_diff = lambda z: np.sum(-1/(z-self.z)**2*self.w)
+        self.residues = np.array([numerator(pole)/denom_diff(pole) for pole in self.poles])
+        print(f'Residues at poles: {self.residues}')
+
+        A[0,1:] = self.w*self.f
+        zeros = sl.eig(A, b = B, right = False)
+        self.zeros = zeros[np.nonzero(np.isfinite(zeros))]
+        print(f'Zeros of rational approximation: {self.zeros}')
+
+
+        return
+
+    def eval(self,zv):
+        #Evaluate the interpolating function constructed with AAA algorithm
+        C = np.zeros((zv.shape[0],self.z.shape[0]),dtype = zv.dtype)
+        for index, z_i in np.ndenumerate(self.z): #Maybe which dimension to iterate over should depend on their sizes?
+            C[:,index[0]] = 1/(zv-z_i)
+        r = C@(self.w*self.f)/(C@self.w)
+        nan_indices = np.argwhere(np.isnan(r)) #Find nans and force interpolation there
+        for index in nan_indices:
+            r[index] = self.f[self.z == zv[index]]
+        return r
         
 
 def robust_pade(c,n,m = None,r_tol = 1e-14):
