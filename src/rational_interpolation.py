@@ -26,29 +26,44 @@ class multi_point_Pade:
 
         #print(self.a)
             
-    def val(self,x):
+    def eval(self,x):
         value = 1.0
         for i in reversed(range(1,self.N)):
             value = 1+ self.a[i]*(x-self.x[i-1])/value
         value = self.a[0]/value
         
         return value
+
+class Thiele:
+    #Implementation of Thieles interpolation formula
+    #The implementation is based on the description in 
+    #Padé approximants (Encyclopedia of Mathematics and its Applications)
+    #by George A. Baker Jr. and Peter Graves-Morris.
+
+    def __init__(self,z,f):
+        if len(z)!= len(f):
+            raise ValueError('The number of interpolation points is different from the number of function samples')
+        
+        self.z = z.copy()
+        self.f = f.copy()
+        self.N = len(f)
+        rho = np.zeros((self.N,self.N),dtype = np.complex128)
+
+        rho[:,0]  = self.f
+        rho[:self.N-1,1] = (self.z[:self.N-1]-self.z[1:])/(rho[:self.N-1,0]-rho[1:,0])
+
+        for i in range(2,self.N):
+            rho[:self.N-i,i] = (self.z[:self.N-i]-self.z[i:])/(rho[:self.N-i,i-1]-rho[1:self.N-i+1,i-1]) + rho[1:self.N-i+1,i-2]
+
+        self.rho = rho[0,:].copy()
+        return
     
-    
-def thieleInterpolator(x, y):
-    ρ = [[yi]*(len(y)-i) for i, yi in enumerate(y)]
-    for i in range(len(ρ)-1):
-        ρ[i][1] = (x[i] - x[i+1]) / (ρ[i][0] - ρ[i+1][0])
-    for i in range(2, len(ρ)):
-        for j in range(len(ρ)-i):
-            ρ[j][i] = (x[j]-x[j+i]) / (ρ[j][i-1]-ρ[j+1][i-1]) + ρ[j+1][i-2]
-    ρ0 = ρ[0]
-    def t(xin):
-        a = 0
-        for i in range(len(ρ0)-1, 1, -1):
-            a = (xin - x[i-1]) / (ρ0[i] - ρ0[i-2] + a)
-        return y[0] + (xin-x[0]) / (ρ0[1]+a)
-    return t
+    def eval(self,z):
+        value = 0
+        for i in range(self.N-1,1,-1):
+            value = (z-self.z[i-1])/(self.rho[i]-self.rho[i-2] + value)
+        value = self.rho[0] + (z-self.z[0])/(self.rho[1] + value)
+        return value   
 
 class MTT:
     #Implementation of the Modified Thacher-Tukey algorithm
@@ -88,7 +103,7 @@ class MTT:
         #Termination stage
         if self.t==0:
             #r(z) = f_0
-            self.val = self.eval_const
+            self.eval = self.eval_const
             return
         
         q_1 = np.ones(self.N,dtype=self.f.dtype)
@@ -100,7 +115,7 @@ class MTT:
             q_2 = q_temp.copy()
         
         if not np.any(np.isclose(q_2,0)):
-            self.val = self.eval_not_const
+            self.eval = self.eval_not_const
             return
         
         else:
