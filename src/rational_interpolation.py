@@ -63,22 +63,7 @@ class Thiele:
         for i in range(self.N-1,1,-1):
             value = (z-self.z[i-1])/(self.rho[i]-self.rho[i-2] + value)
         value = self.rho[0] + (z-self.z[0])/(self.rho[1] + value)
-        return value
-    
-def thieleInterpolator(x, y):
-    ρ = [[yi]*(len(y)-i) for i, yi in enumerate(y)]
-    for i in range(len(ρ)-1):
-        ρ[i][1] = (x[i] - x[i+1]) / (ρ[i][0] - ρ[i+1][0])
-    for i in range(2, len(ρ)):
-        for j in range(len(ρ)-i):
-            ρ[j][i] = (x[j]-x[j+i]) / (ρ[j][i-1]-ρ[j+1][i-1]) + ρ[j+1][i-2]
-    ρ0 = ρ[0]
-    def t(xin):
-        a = 0
-        for i in range(len(ρ0)-1, 1, -1):
-            a = (xin - x[i-1]) / (ρ0[i] - ρ0[i-2] + a)
-        return y[0] + (xin-x[0]) / (ρ0[1]+a)
-    return t
+        return value   
 
 class MTT:
     #Implementation of the Modified Thacher-Tukey algorithm

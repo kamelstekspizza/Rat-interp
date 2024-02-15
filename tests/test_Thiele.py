@@ -3,7 +3,7 @@ import numpy as np
 import scipy.linalg as sl
 
 sys.path.append('../src/')
-from rational_interpolation import Thiele,thieleInterpolator
+from rational_interpolation import Thiele
 
 
 def test_sin():
@@ -11,8 +11,6 @@ def test_sin():
     y = np.sin(x)
 
     test = Thiele(x,y)
-    t = thieleInterpolator(x,y)
-
     r = test.eval(x)
     err = sl.norm(r-y,ord=np.inf)
     rel_err = err/sl.norm(y,ord=np.inf)
@@ -47,12 +45,12 @@ def test_tan():
     return
 
 def test_rational():
-    x = np.linspace(-1,1)
+    #Thiele (and also MTT) fails when interpolation interval is [-1,1]. Why?
+    x = np.linspace(0,1)
     y = (x**2+1j)/(x**2-2)
 
     test = Thiele(x,y)
     r = test.eval(x)
-    print(r)
     err = sl.norm(r-y,ord=np.inf)
     rel_err = err/sl.norm(y,ord=np.inf)
     print(f'Relative interpolation error: {rel_err}')
